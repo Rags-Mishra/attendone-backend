@@ -1,52 +1,48 @@
-const express = require("express");
+import express from 'express'
+import {pool} from '../config/db.js'
+
+import { authenticate, authorizeRole } from '../middleware/auth.js'
+
 const router = express.Router();
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const config = require("config");
-const { check, validationResult } = require("express-validator");
 
-const Attendance = require("../models/attendance");
-const { async } = require("regenerator-runtime");
-
-// GET- all attendance with the asked subject
-router.get("",async (req, res) => {
- try { const attendance=await Attendance.find({}).sort({date:1});
- res.json(attendance);
- } catch (error) {
-  console.log(error);
-  res.status(500).send("Server Error");
- }
-})
-//POST- Mark attendance for that day
-
-router.post(
-  "/",
-  // [
-  //   check("present", "Please mark all the students").not().isEmpty(),
-  //   check("absent", "Please mark all the students").not().isEmpty(),
-  // ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { present, absent, course, date } = req.body;
-
-    try {
-      const attendance = new Attendance({
-        present,
-        absent,
-        course,
-        date,
-      });
-      await attendance.save();
-      res.json(attendance);
-    } catch (error) {
-      console.error(error.message);
-      res.status(500).send("Server Error");
-    }
+// Mark attendance
+router.post("/mark", authenticate, authorizeRole("teacher", "admin"), async (req, res) => {
+  const { studentId, classId, date, status } = req.body;
+  try {
+    await pool.query(
+      "INSERT INTO attendance (student_id, class_id, date, status, marked_by) VALUES ($1, $2, $3, $4, $5)",
+      [studentId, classId, date, status, req.user.id]
+    );
+    res.json({ message: "Attendance marked" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-);
+});
 
-module.exports = router;
+// Get class attendance
+router.get("/class/:id", authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM attendance WHERE class_id=$1",
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get student attendance
+router.get("/student/:id", authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM attendance WHERE student_id=$1",
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

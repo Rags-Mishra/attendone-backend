@@ -1,33 +1,30 @@
-require("dotenv").config();
-const express = require("express");
-const connectDB = require("./config/db");
-const path = require("path");
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/auth.js";
+import classRoutes from "./routes/classes.js";
+import attendanceRoutes from "./routes/attendance.js";
+dotenv.config();
 const app = express();
-var cors = require("cors");
-const auth = require("./middleware/auth");
+console.log("DB password:", process.env.DB_PASSWORD); 
+console.log("h",process.cwd()); 
+app.use(cookieParser());
+app.use(cors({
+    origin: "http://localhost:5173", // frontend URL
+    credentials: true,               // allow cookies/Authorization headers
+  }));
+app.use(express.json());
 
-connectDB();
+// Routes
+app.use("/auth", authRoutes);
+app.use("/classes", classRoutes);
+app.use("/attendance", attendanceRoutes);
 
-// Init Middleware
-app.use(express.json({ extended: false }));
-app.use(cors());
-// Define Routes
-app.use("/api/teacher", require("./routes/teacher"));
-app.use("/api/student", require("./routes/student"));
-app.use("/api/studentauth", require("./routes/studentauth"));
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/attendance", require("./routes/attendance"));
-app.use(express.static(path.join(__dirname,"client/build")))
-// Serve static assets in production
-if (process.env.NODE_ENV === "production") {
-  // Set static folder
-  app.use(express.static("client/build"));
-
-  app.get("*", (req, res) =>
-    res.sendFile(path.resolve(__dirname, "client", "build", "index.html"))
-  );
-}
+// Root
+app.get("/", (req, res) => {
+  res.send("Attendance API is running...");
+});
 
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

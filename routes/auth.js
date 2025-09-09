@@ -1,78 +1,112 @@
-const express = require("express");
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { pool } from "../config/db.js";
+import { authenticate } from "../middleware/auth.js";
 const router = express.Router();
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const config = require("config");
-const auth = require("../middleware/auth");
-const { check, validationResult } = require("express-validator");
-
-const Teacher = require("../models/teacher");
-
-// @route     GET api/auth
-// @desc      Get logged in teacher
-// @access    Private
-router.get("/", auth, async (req, res) => {
+const REFRESH_SECRET = process.env.REFRESH_SECRET;
+// Signup
+router.post("/signup", async (req, res) => {
+  const { name, email, password, role } = req.body;
   try {
-    const teacher = await Teacher.findById(req.teacher.id).select("-password");
-    res.json(teacher);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      "INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id",
+      [name, email, hashedPassword, role]
+    );
+
+    res.json({ message: "User registered", userId: result.rows[0].id });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
+    res.status(500).json({ error: err.message });
   }
 });
 
-// @route     POST api/auth
-// @desc      Auth teacher & get token
-// @access    Public
-router.post(
-  "/",
-  [
-    check("email", "Please include a valid email").isEmail(),
-    check("password", "Password is required").exists(),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+// Login
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE email=$1", [
+      email,
+    ]);
+    if (result.rows.length === 0)
+      return res.status(400).json({ message: "User not found" });
 
-    const { email, password } = req.body;
+    const user = result.rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ message: "Invalid credentials" });
 
-    try {
-      let teacher = await Teacher.findOne({ email });
-
-      if (!teacher) {
-        return res.status(400).json({ msg: "Invalid Credentials" });
+    const token = jwt.sign(
+      { id: user.id, role: user.role, email: user.email, name: user.name   },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    const refreshToken = jwt.sign(
+      { id: user.id, role: user.role, email: user.email, name: user.name   },
+      REFRESH_SECRET,
+      {
+        expiresIn: "7d",
       }
-
-      const isMatch = await bcrypt.compare(password, teacher.password);
-
-      if (!isMatch) {
-        return res.status(400).json({ msg: "Invalid Credentials" });
-      }
-
-      const payload = {
-        teacher: {
-          id: teacher.id,
-        },
-      };
-
-      jwt.sign(
-        payload,
-        config.get("jwtSecret"),
-        {
-          expiresIn: 360000,
-        },
-        (err, token) => {
-          if (err) throw err;
-          res.json({ token });
-        }
-      );
-    } catch (err) {
-      console.error(err.message);
-      res.status(500).send("Server Error");
-    }
+    );
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false, // only over HTTPS in production
+      sameSite: "",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name:user.name
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-);
+});
+router.post("/refresh", (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken)
+    return res.status(401).json({ message: "No refresh token" });
 
-module.exports = router;
+  try {
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
+
+    // Issue new access token
+    const token = jwt.sign(
+      { id: decoded.id, email: decoded.email, name:decoded.name, role:decoded.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.json({ token });
+  } catch (err) {
+    res.status(403).json({ message: err.message });
+  }
+});
+router.get("/profile", authenticate, async (req, res) => {
+  try {
+    res.json({
+      data: { id: req.user.id, email:  req.user.email, role:  req.user.role, name:  req.user.name },
+      message: "Welcome to your profile 🚀",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router.post("/logout", (req, res) => {
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: false,       // ✅ only over HTTPS
+    sameSite: "", // ✅ CSRF protection
+    path: "/",          // must match cookie path
+  });
+
+  return res.json({ message: "Logged out successfully" });
+});
+export default router;
