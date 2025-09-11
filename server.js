@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 app.use(cookieParser());
 app.use(cors({
-    origin: "http://localhost:5173", // frontend URL
+    origin: "https://attendone.netlify.app/", // frontend URL
     credentials: true,               // allow cookies/Authorization headers
   }));
 app.use(express.json());

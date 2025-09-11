@@ -50,7 +50,7 @@ router.post("/login", async (req, res) => {
     );
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: false, // only over HTTPS in production
+      secure: true, // only over HTTPS in production
       sameSite: "",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
@@ -102,7 +102,7 @@ router.get("/profile", authenticate, async (req, res) => {
 router.post("/logout", (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: false,       // ✅ only over HTTPS
+    secure: true,       // ✅ only over HTTPS
     sameSite: "", // ✅ CSRF protection
     path: "/",          // must match cookie path
   });
