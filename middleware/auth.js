@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 export function authenticate(req, res, next) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // "Bearer <token>"
- console.log(req.headers)
   if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
@@ -18,6 +17,7 @@ export function authenticate(req, res, next) {
 }
 export function authorizeRole(...roles) {
   return (req, res, next) => {
+    console.log(roles, req.user.role)
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: "Forbidden" });
     }

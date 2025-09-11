@@ -36,7 +36,14 @@ router.post("/:id/add-student", authenticate, authorizeRole("teacher", "admin"),
 // List classes
 router.get("/", authenticate, async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM classes");
+    const result = await pool.query(` SELECT 
+        c.id,
+        c.name,
+        COUNT(s.student_id) AS student_count
+      FROM classes c
+      LEFT JOIN student_classes s ON s.class_id = c.id
+      GROUP BY c.id, c.name
+      ORDER BY c.id`);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
