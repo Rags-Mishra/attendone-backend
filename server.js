@@ -7,11 +7,13 @@ import classRoutes from "./routes/classes.js";
 import attendanceRoutes from "./routes/attendance.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import studentRoutes from "./routes/students.js";
+import schoolRoutes from "./routes/school.js";
 dotenv.config();
 const app = express();
 app.use(cookieParser());
 app.use(cors({
-    origin: "https://attendone.netlify.app", // frontend URL
+    // origin: "https://attendone.netlify.app", // frontend URL
+    origin: ["http://localhost:5173","http://10.59.19.218:5173"], // frontend URL
     credentials: true,               // allow cookies/Authorization headers
   }));
 app.use(express.json());
@@ -22,6 +24,7 @@ app.use("/classes", classRoutes);
 app.use("/attendance", attendanceRoutes);
 app.use("/students", studentRoutes);
 app.use("/dashboard", dashboardRoutes);
+app.use("/schools", schoolRoutes);
 
 // Root
 app.get("/", (req, res) => {

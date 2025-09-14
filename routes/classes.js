@@ -6,12 +6,12 @@ import { authenticate, authorizeRole } from '../middleware/auth.js'
 const router = express.Router();
 
 // Create class (teacher/admin)
-router.post("/", authenticate, authorizeRole("teacher", "admin"), async (req, res) => {
-  const { name } = req.body;
+router.post("/",authenticate,authorizeRole("admin","teacher"),  async (req, res) => {
+  const { name,school_id } = req.body;
   try {
     const result = await pool.query(
-      "INSERT INTO classes (name, teacher_id) VALUES ($1, $2) RETURNING *",
-      [name, req.user.id]
+      "INSERT INTO classes (name, school_id) VALUES ($1, $2) RETURNING *",
+      [name, school_id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -19,6 +19,36 @@ router.post("/", authenticate, authorizeRole("teacher", "admin"), async (req, re
   }
 });
 
+router.put("/:id",authenticate,authorizeRole("admin","teacher"),  async (req, res) => {
+  const { name } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE classes SET name =$1 WHERE id=$2",
+      [name,req.params.id]
+    );
+    res.json({
+      message:"Data updated",
+      status:'success'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id",authenticate,authorizeRole("admin","teacher"),  async (req, res) => {
+  try {
+    const result = await pool.query(
+      "DELETE FROM classes WHERE id=$1",
+      [req.params.id]
+    );
+    res.json({
+      message:'Data deleted',
+      status:'success'
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Add student to class
 router.post("/:id/add-student", authenticate, authorizeRole("teacher", "admin"), async (req, res) => {
   const { studentId } = req.body;
@@ -33,8 +63,8 @@ router.post("/:id/add-student", authenticate, authorizeRole("teacher", "admin"),
   }
 });
 
-// List classes
-router.get("/", authenticate, async (req, res) => {
+// List classes by school
+router.get("/:school_id",  async (req, res) => {
   try {
     const result = await pool.query(` SELECT 
         c.id,
@@ -42,8 +72,9 @@ router.get("/", authenticate, async (req, res) => {
         COUNT(s.student_id) AS student_count
       FROM classes c
       LEFT JOIN student_classes s ON s.class_id = c.id
+      where school_id = $1
       GROUP BY c.id, c.name
-      ORDER BY c.id`);
+      ORDER BY c.id`,[req.params.school_id]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
