@@ -70,10 +70,7 @@ router.post('/google', async (req, res) => {
 
     if (user.rows.length === 0) {
       // Insert new user
-      user = await pool.query(
-        'INSERT INTO users ( email, name, role, school_id) VALUES ($1, $2, $3, $4) RETURNING *',
-        [ email, name, role, school_id]
-      );
+      
       if (role === "admin") {
         const schoolResult = await pool.query(
           "INSERT INTO school (name) values ($1) returning id",
