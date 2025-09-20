@@ -68,7 +68,7 @@ router.post('/google', async (req, res) => {
     // Check if user exists in PostgreSQL
     let user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
-    if (user.rows.length === 0) {
+    if (user.rows.length === 0) { 
       // Insert new user
       
       if (role === "admin") {
@@ -112,7 +112,7 @@ router.post('/google', async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true, // only over HTTPS in production
-      sameSite: "",
+      sameSite:"None",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     res.json({
@@ -154,7 +154,7 @@ router.post("/login", async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true, // only over HTTPS in production
-      sameSite: "",
+      sameSite:"None",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -212,7 +212,7 @@ router.post("/logout", (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: true, // ✅ only over HTTPS
-    sameSite: "", // ✅ CSRF protection
+    sameSite:"None", // ✅ CSRF protection
     path: "/", // must match cookie path
   });
 
