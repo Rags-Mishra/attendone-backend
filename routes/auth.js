@@ -21,7 +21,7 @@ router.post("/signup", async (req, res) => {
     if (isExisting.rows.length > 0) {
       res.json({
         message: "User with this id exists",
-        status: error,
+        status: 'error',
       });
       return;
     }
@@ -50,9 +50,9 @@ router.post("/signup", async (req, res) => {
       const student_class_result = await pool.query("INSERT INTO student_classes (student_id, class_id) VALUES ($1, $2)",
         [result.rows[0].id, class_section])
     }
-    res.json({ message: "User registered", userId: result.rows[0].id });
+    res.json({ message: "User registered", userId: result.rows[0].id, status:'success' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message, status:'error' });
   }
 });
 
@@ -68,9 +68,9 @@ router.post('/google', async (req, res) => {
     // Check if user exists in PostgreSQL
     let user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
-    if (user.rows.length === 0) { 
+    if (user.rows.length === 0) {
       // Insert new user
-      
+      if (!role && !school_id && !class_section) return res.status(400).message("No account found. Signup with google to proceed")
       if (role === "admin") {
         const schoolResult = await pool.query(
           "INSERT INTO school (name) values ($1) returning id",
@@ -86,13 +86,13 @@ router.post('/google', async (req, res) => {
           [name, email, role, school_id]
         );
       }
-      else{
-         user = await pool.query(
-        "INSERT INTO users (name, email, role, school_id) VALUES ($1, $2, $3, $4) RETURNING id",
-        [name, email, role, school_id]
-      );
-      const student_class_result = await pool.query("INSERT INTO student_classes (student_id, class_id) VALUES ($1, $2)",
-        [user.rows[0].id, class_section])
+      else {
+        user = await pool.query(
+          "INSERT INTO users (name, email, role, school_id) VALUES ($1, $2, $3, $4) RETURNING id",
+          [name, email, role, school_id]
+        );
+        const student_class_result = await pool.query("INSERT INTO student_classes (student_id, class_id) VALUES ($1, $2)",
+          [user.rows[0].id, class_section])
       }
     } else {
       user = user.rows[0];
@@ -112,17 +112,18 @@ router.post('/google', async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true, // only over HTTPS in production
-      sameSite:"None",
+      sameSite: "None",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     res.json({
       message: 'Signed in successfully',
       token: token,
       data: user.rows ? user.rows[0] : user,
+      status: 'success'
     });
   } catch (error) {
     console.error(error);
-    res.status(401).json({ message: 'Invalid ID token' });
+    res.status(401).json({ message: error.message, status: 'error' });
   }
 });
 
@@ -134,11 +135,11 @@ router.post("/login", async (req, res) => {
       email,
     ]);
     if (result.rows.length === 0)
-      return res.status(400).json({ message: "User not found" });
+      return res.status(400).json({ message: "User not found", status: 'error' });
 
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return res.status(400).json({ message: "Invalid credentials" });
+    if (!valid) return res.status(400).json({ message: "Invalid credentials", status: 'error' });
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email, name: user.name, school_id: user.school_id },
       process.env.JWT_SECRET,
@@ -154,16 +155,17 @@ router.post("/login", async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true, // only over HTTPS in production
-      sameSite:"None",
+      sameSite: "None",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     res.json({
       message: "Login successful",
-      token: token
+      token: token,
+      status: 'success'
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ mesage: err.message, status: 'error' });
   }
 });
 router.post("/refresh", (req, res) => {
@@ -209,13 +211,18 @@ router.get("/profile", authenticate, async (req, res) => {
   }
 });
 router.post("/logout", (req, res) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: true, // ✅ only over HTTPS
-    sameSite:"None", // ✅ CSRF protection
-    path: "/", // must match cookie path
-  });
+  try {
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: true, // ✅ only over HTTPS
+      sameSite: "None", // ✅ CSRF protection
+      path: "/", // must match cookie path
+    });
 
-  return res.json({ message: "Logged out successfully" });
+    return res.status(200).json({ message: "Logged out successfully", status: 'success' });
+  }
+  catch (error) {
+    res.status(500).json({ message: error.message, status: 'error' })
+  }
 });
 export default router;
